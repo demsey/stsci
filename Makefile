@@ -11,21 +11,25 @@ else
 
 export ARCH=sh
 
-#ifndef KDIR
-#ifdef STM22
-export KDIR=~/devel/openE2/cuberevo-mini2/build/tmp/work/sh4-linux/linux-cuberevo-mini2-2.6.23.17+stm23+0123-r0.0/stblinux-2.6.23.17
-#else
-export KDIR=~/devel/opensh4stm23/cuberevo-mini2/build/tmp/work/sh4-linux/linux-cuberevo-mini2-2.6.17.14+stm22+0041-r0.0/stblinux-2.6.17.14
-#endif /* STM22 */
-#endif /* KDIR */
+ifneq (,$(findstring STM22,$(EXTRA_CFLAGS)))
+STM22=1
+endif
 
-#ifndef CROSS_COMPILE
-#ifdef STM22
-export CROSS_COMPILE=~/devel/openE2/cuberevo-mini2/build/tmp/cross/sh4/bin/sh4-linux-
-#else
+ifndef KDIR
+ifdef STM22
+export KDIR=~/devel/opensh4stm23/cuberevo-mini2/build/tmp/work/sh4-linux/linux-cuberevo-mini2-2.6.17.14+stm22+0041-r0.0/stblinux-2.6.17.14
+else
+export KDIR=~/devel/openE2/cuberevo-mini2/build/tmp/work/sh4-linux/linux-cuberevo-mini2-2.6.23.17+stm23+0123-r0.0/stblinux-2.6.23.17
+endif # STM22
+endif # KDIR
+
+ifndef CROSS_COMPILE
+ifdef STM22
 export CROSS_COMPILE=~/devel/opensh4stm23/cuberevo-mini2/build/tmp/cross/sh4/bin/sh4-linux-
-#endif /* STM22 */
-#endif /* CROSS_COMPILE */
+else
+export CROSS_COMPILE=~/devel/openE2/cuberevo-mini2/build/tmp/cross/sh4/bin/sh4-linux-
+endif # STM22
+endif # CROSS_COMPILE
 
 all:
 #	$(MAKE) -C $(KDIR) M=`pwd` $@
