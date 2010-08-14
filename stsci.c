@@ -338,9 +338,13 @@ static void sci_reset(struct work_struct *work)
 static int sci_startup(struct uart_port *port)
 {
 	struct sci_port *sciport = to_sci_port(port);
+	struct ktermios *ios = port->info->tty->termios;
 
         printk(KERN_INFO "SCI startup.\n");
 
+	/* Selects raw (non-canonical) input and output */
+	ios->c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+	ios->c_oflag &= ~OPOST;
 //	sci_pios_init(port);
 //	sci_request_irq(port);
 
