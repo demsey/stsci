@@ -1,3 +1,8 @@
+/*
+ *  drivers/serial/stsci.c
+ *  Open ST40 SmartCard Interface (SCI) driver
+ */
+
 #include <linux/version.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
 #define STM23
@@ -274,7 +279,7 @@ static unsigned int sci_get_mctrl(struct uart_port *port)
 static void sci_start_tx(struct uart_port *port)
 {
 //	struct sci_port *sciport = to_sci_port(port);
-        printk(KERN_INFO "SCI start_tx.\n");
+        printk(KERN_INFO "STSCI start_tx.\n");
 	sci_transmit_chars(port);
 }
 
@@ -284,7 +289,7 @@ static void sci_start_tx(struct uart_port *port)
 static void sci_stop_tx(struct uart_port *port)
 {
 	sci_disable_tx_interrupts(port);
-        printk(KERN_INFO "SCI stop_tx.\n");
+        printk(KERN_INFO "STSCI stop_tx.\n");
 }
 
 /*
@@ -296,7 +301,7 @@ static void sci_stop_rx(struct uart_port *port)
 	syscfg_disable_auto_vcc(port);
 	scg_disable_clock(port);
 	sci_disable_rx_interrupts(port);
-        printk(KERN_INFO "SCI stop_rx.\n");
+        printk(KERN_INFO "STSCI stop_rx.\n");
 }
 
 
@@ -340,7 +345,7 @@ static int sci_startup(struct uart_port *port)
 	struct sci_port *sciport = to_sci_port(port);
 	struct ktermios *ios = port->info->tty->termios;
 
-        printk(KERN_INFO "SCI startup.\n");
+        printk(KERN_INFO "STSCI startup.\n");
 
 	/* Selects raw (non-canonical) input and output */
 	ios->c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
@@ -394,14 +399,13 @@ static void sci_shutdown(struct uart_port *port)
 	kfifo_free(sciport->receq);
 	kfifo_free(sciport->flagq);
 
-        printk(KERN_INFO "SCI shutdown.\n");
+        printk(KERN_INFO "STSCI shutdown.\n");
 }
 static void sci_release_port(struct uart_port *port)
 {
 	/* Nothing here yet .. */
 	struct sci_port *sciport = to_sci_port(port);
 
-	printk(KERN_DEBUG "5) SYS_CFG7\n" );
 	release_mem_region(port->mapbase, 0x100+1);
 	iounmap(port->membase);
 #ifdef STM22
@@ -454,8 +458,6 @@ static void sci_config_port(struct uart_port *port, int flags)
 	if (!port->membase)
 		return;
 
-	printk(KERN_DEBUG "HZ: %d\n", HZ);
-
 	sciport->configured = 0;
 
 //	syscfg_enable_auto_vcc(port);
@@ -468,7 +470,7 @@ static void sci_config_port(struct uart_port *port, int flags)
 
 	port->type = PORT_SCI;
 	port->fifosize = FIFO_SIZE;
-        printk(KERN_INFO "SCI config.\n");
+        printk(KERN_INFO "STSCI config.\n");
 }
 
 #ifdef STM22
@@ -492,11 +494,11 @@ static void sci_set_termios(struct uart_port *port,
 	unsigned long flags;
 	unsigned int baud;
 
-        printk(KERN_INFO "SCI set_termios.\n");
+        printk(KERN_INFO "STSCI set_termios.\n");
 
 	baud = uart_get_baud_rate(port, termios, old, 0,
 				port->uartclk/16);
-        printk(KERN_DEBUG "SCI set_termios baud: %d\n", baud);
+        printk(KERN_DEBUG "STSCI set_termios baud: %d\n", baud);
 
 	/* wait for end of current transmission */
 //	while (!sci_tx_empty(port)){};
@@ -1339,9 +1341,6 @@ static int __init sci_init(void)
         struct clk *clk;
         unsigned long rate;
 
-	printk(KERN_INFO "Pio tester started!\n");
-
-
 #ifdef STM22 
         clk = clk_get("comms_clk");
         if (IS_ERR(clk)) clk = clk_get("bus_clk");
@@ -1364,6 +1363,8 @@ static int __init sci_init(void)
 		}
 	}
 
+	printk(KERN_INFO "STSCI registered\n");
+
 	return ret;
 
 }
@@ -1381,7 +1382,7 @@ static void __exit sci_exit(void)
 	}
 	uart_unregister_driver(&sci_uart_driver);
 
- 	printk(KERN_INFO "Pio tester unloaded.\n");
+ 	printk(KERN_INFO "STSCI unregistered.\n");
         return;
 }
 
@@ -1389,5 +1390,5 @@ module_init(sci_init);
 module_exit(sci_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Robert Demski");
-MODULE_DESCRIPTION("Pio tester driver");
+MODULE_AUTHOR("Robert Demski <demsey@users.sourceforge.net>");
+MODULE_DESCRIPTION("Open ST40 SmartCard Interface (SCI) driver");

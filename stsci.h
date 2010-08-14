@@ -1,3 +1,17 @@
+/*
+ *  drivers/serial/stsci.h
+ *
+ *  Open ST40 Smartcard Card Interface (SCI) driver
+ *  Derived from sh-sci.h and stasc.h
+ *  Copyright (c) PKT Polish Kathi Team
+ *  Author: Robert Demski (August 2010)
+ *
+ *  Know-how for the Asynchronous Serial Controller in the ST40 SoC
+ *  can be found in the following places:
+ *
+ *    1) ASC - STM kernel source drivers/serial/stasc.c
+ *    2) SYSCON - STM kernel source includes/linux/stm/syscon.h
+ */
 
 #ifndef _STSCI_H
 #define _STSCI_H
