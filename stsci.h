@@ -1,7 +1,7 @@
 /*
  *  drivers/serial/stsci.h
  *
- *  Open ST40 Smartcard Card Interface (SCI) driver
+ *  Open ST40 SmartCard Interface (SCI) driver
  *  Derived from sh-sci.h and stasc.h
  *  Copyright (c) PKT Polish Kathi Team
  *  Author: Robert Demski (August 2010)
