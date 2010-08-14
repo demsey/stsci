@@ -343,7 +343,11 @@ static void sci_reset(struct work_struct *work)
 static int sci_startup(struct uart_port *port)
 {
 	struct sci_port *sciport = to_sci_port(port);
+#ifdef STM22
+	struct termios *ios = port->info->tty->termios;
+#else
 	struct ktermios *ios = port->info->tty->termios;
+#endif
 
         printk(KERN_INFO "STSCI startup.\n");
 
@@ -419,6 +423,8 @@ static void sci_release_port(struct uart_port *port)
 #endif
 }
 
+#ifdef STM22
+#else
 static void sci_configure_field(struct cfg_bits* f )
 {
 	int lsb = ffs(f->mask)-1;
@@ -427,6 +433,7 @@ static void sci_configure_field(struct cfg_bits* f )
 //	printk(KERN_DEBUG "wartość: 0x%04x  indeks: %u\n", mask, 9-ffs(bitrev8(mask)));
 	f->field = sysconf_claim(f->group,f->reg,lsb,msb,"stsci");
 }
+#endif
 
 static int sci_request_port(struct uart_port *port)
 {
