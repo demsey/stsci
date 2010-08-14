@@ -2,7 +2,7 @@
 #include <asm/ioctl.h>
 
 /* SCI driver modes */
-typedef struct sci_modes
+struct sci_modes
 {
     int emv2000;
     int dma;
@@ -11,7 +11,7 @@ typedef struct sci_modes
 };
 
 /* SCI communication parameters */
-typedef struct sci_parameters
+struct sci_parameters
 {
     unsigned char T;			//Protocol type
     unsigned long fs;			//The subsequent frequency during subsequent transmission
