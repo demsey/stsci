@@ -581,7 +581,6 @@ struct sci_port sci_ports[SCI_NPORTS] = {
 	/* UART0 */
 	{
 		.port	= {
-			.membase	= (void *)0xb8030000,
 			.mapbase	= 0x18030000,
 			.iotype		= SERIAL_IO_MEM,
 			.irq		= 123,
@@ -632,8 +631,7 @@ struct sci_port sci_ports[SCI_NPORTS] = {
 	/* UART1 */
 	{
 		.port	= {
-			.membase	= (void *)0xb8031000,
-			.mapbase	= 0xb8031000,
+			.mapbase	= 0x18031000,
 			.iotype		= SERIAL_IO_MEM,
 			.irq		= 122,
 			.ops		= &sci_uart_ops,
