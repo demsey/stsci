@@ -42,7 +42,6 @@
 
 
 struct sci_port;
-static void sci_dir_interrupt(struct stpio_pin *pin, void *dev);
 static void sci_socket_interrupt(struct stpio_pin *pin, void *dev);
 static void scg_enable_clock( struct uart_port *port );
 static void scg_disable_clock( struct uart_port *port );
@@ -148,12 +147,6 @@ static struct sci_pio sci_pios0[] = {
 		.pin	= 1,
 		.dir 	= STPIO_IN,
 	},
-	[2] = {
-		.name   = "SC_EXTCLKIN",
-		.port	= 0,
-		.pin	= 2,
-		.dir 	= STPIO_IN,
-	},
 	[3] = {
 		.name   = "SC_CLK_OUT",
 		.port	= 0,
@@ -171,13 +164,6 @@ static struct sci_pio sci_pios0[] = {
 		.port	= 0,
 		.pin	= 5,
 		.dir 	= STPIO_ALT_OUT,
-	},
-	[6] = {
-		.name  	= "UART0_DIR",
-		.port	= 0,
-		.pin	= 6,
-		.dir 	= STPIO_ALT_BIDIR,
-		.handler= sci_dir_interrupt,
 	},
 	[7] = {
 		.name  	= "SC_DETECT",
@@ -729,17 +715,6 @@ static inline void sci_enable(struct work_struct *work)
 	
 //	msleep(5);
 //	asc_out(port, CTL, asc_in(port, CTL)|ASC_CTL_RXENABLE);
-}
-
-static void sci_dir_interrupt(struct stpio_pin *pin, void *dev)
-{
-//	struct uart_port *port = dev;
-//	struct sci_port *sciport = to_sci_port(dev);
-//	struct sci_pio *pio = &(sciport->pios[UART_DIR]);
-	unsigned int in = stpio_get_pin(pin);
-	stpio_disable_irq(pin);
-	stpio_enable_irq(pin, in);
-//	printk(KERN_DEBUG "Direction changed to %d\n", in);
 }
 
 static void sci_socket_interrupt(struct stpio_pin *pin, void *dev)
@@ -1306,6 +1281,8 @@ static int sci_pios_init(struct uart_port *port){
 
 	for( i=0;i<sciport->pios_nr; i++){
 		struct sci_pio *pio = &(sciport->pios[i]);
+		if (!pio->name)  //FIXME possible garbage
+			continue;
 		pio->pio = stpio_request_pin(pio->port, pio->pin, pio->name, pio->dir);
 		if (pio->pio){
 			printk(KERN_DEBUG "Pio[%d,%d] \"%s\" allocated\n", pio->port,pio->pin,pio->name);
@@ -1332,6 +1309,8 @@ static int sci_pios_free(struct uart_port *port){
 	printk(KERN_DEBUG "Pios free\n");
 	for( i=0;i<sciport->pios_nr; i++){
 		struct sci_pio *pio = &(sciport->pios[i]);
+		if (!pio->name)  //FIXME possible garbage
+			continue;
 		if (pio->handler != NULL)
 			stpio_free_irq(pio->pio);
 		if (pio->pio != NULL)
