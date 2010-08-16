@@ -329,17 +329,9 @@ static void sci_reset(struct work_struct *work)
 static int sci_startup(struct uart_port *port)
 {
 	struct sci_port *sciport = to_sci_port(port);
-#ifdef STM22
-	struct termios *ios = port->info->tty->termios;
-#else
-	struct ktermios *ios = port->info->tty->termios;
-#endif
 
         printk(KERN_INFO "STSCI startup.\n");
 
-	/* Selects raw (non-canonical) input and output */
-	ios->c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
-	ios->c_oflag &= ~OPOST;
 //	sci_pios_init(port);
 //	sci_request_irq(port);
 
@@ -1319,6 +1311,17 @@ static int sci_pios_free(struct uart_port *port){
 	return 0;
 }
 
+static void sci_tty_config(struct tty_driver *tty_driver)
+{
+#ifdef STM22
+	struct termios *ios = &tty_driver->init_termios;
+#else
+	struct ktermios *ios = &tty_driver->init_termios;
+#endif
+	/* Selects raw (non-canonical) input and output */
+	ios->c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+}
+
 static int __init sci_init(void)
 {
 	int line, ret;
@@ -1336,8 +1339,7 @@ static int __init sci_init(void)
 	printk(KERN_DEBUG "Rate: %d\n", (int)rate);
 
 	ret = uart_register_driver(&sci_uart_driver);
-//	struct tty_driver *tty_driver = &sci_uart_driver;
-//	tty_driver->flags |= TTY_NO_WRITE_SPLIT;
+	sci_tty_config(sci_uart_driver.tty_driver);
 	if (ret == 0) {
 //		for (line=0; line<SCI_NPORTS; line++) {
 		for (line=0; line<1; line++) {
