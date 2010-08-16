@@ -1318,8 +1318,11 @@ static void sci_tty_config(struct tty_driver *tty_driver)
 #else
 	struct ktermios *ios = &tty_driver->init_termios;
 #endif
-	/* Selects raw (non-canonical) input and output */
+	/* Selects raw (non-canonical) input and output
+	   simple glibc cfmakeraw macro */
+	ios->c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL|IXON);
 	ios->c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+	ios->c_oflag &= ~OPOST;
 }
 
 static int __init sci_init(void)
