@@ -347,6 +347,8 @@ static int sci_startup(struct uart_port *port)
 	sciport->receq = kfifo_alloc(256, GFP_KERNEL, sciport->receq_lock);
 	sciport->flagq = kfifo_alloc(256, GFP_KERNEL, sciport->receq_lock);
 	sciport->configured = 0;
+	sciport->isatr = 0;
+	sciport->ts    = 0;
 
 	syscfg_enable_scg_clock(port);
 
@@ -595,8 +597,6 @@ struct sci_port sci_ports[SCI_NPORTS] = {
 			.group	= SYS_CFG,
 			.reg	= 7,
 		},
-		.isatr	=	0,
-		.ts	=	0,
 	},
 	/* UART1 */
 	{
@@ -630,8 +630,6 @@ struct sci_port sci_ports[SCI_NPORTS] = {
 			.addr	= SYS_CFG7,		/* COMMs configuration register */
 			.mask	= PIO1_SCCLK_NOT_CLK_DSS,
 		},
-		.isatr	=	0,
-		.ts	=	0,
 	},
 };
 
