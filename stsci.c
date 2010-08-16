@@ -466,14 +466,6 @@ static void sci_set_termios(struct uart_port *port,
                             struct ktermios *termios, struct ktermios *old)
 #endif
 {
-//	struct asc_port *ascport = &asc_ports[port->line];
-//	unsigned int baud;
-
-//	baud = uart_get_baud_rate(port, termios, old, 0,
-//				  port->uartclk/16);
-
-//	asc_set_termios_cflag(ascport, termios->c_cflag, baud);
-
 	struct sci_port *sciport = to_sci_port(port);
 	unsigned int ctrl_val;
 	unsigned long flags;
@@ -481,14 +473,14 @@ static void sci_set_termios(struct uart_port *port,
 
         printk(KERN_INFO "STSCI set_termios.\n");
 
+	spin_lock_irqsave(&port->lock, flags);
+
 	baud = uart_get_baud_rate(port, termios, old, 0,
 				port->uartclk/16);
         printk(KERN_DEBUG "STSCI set_termios baud: %d\n", baud);
 
 	/* wait for end of current transmission */
 //	while (!sci_tx_empty(port)){};
-
-	spin_lock_irqsave(&port->lock, flags);
 
         /* read control register */
         ctrl_val = asc_in (port, CTL);
