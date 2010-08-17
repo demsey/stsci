@@ -1160,8 +1160,10 @@ static char *sci_hexdump(int m, unsigned char *buf, size_t n)
 	m=(m)?3:2;
 	if (m*n>=(int)sizeof(dump))
 		n=(sizeof(dump)/m)-1;
-	while (i<n)
-		sprintf(dump+(m*i++), "%02X%s", *buf++, (m>2)?" ":"");
+	while (i<n){
+		sprintf(dump+(m*i), "%02x%s", *buf++, (m>2 && i<n)?" ":"");
+		i++;
+	}
 	return dump;
 }
 
