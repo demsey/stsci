@@ -264,7 +264,6 @@ static unsigned int sci_get_mctrl(struct uart_port *port)
  */
 static void sci_start_tx(struct uart_port *port)
 {
-//	struct sci_port *sciport = to_sci_port(port);
         printk(KERN_INFO "STSCI start_tx.\n");
 	sci_transmit_chars(port);
 }
@@ -283,7 +282,6 @@ static void sci_stop_tx(struct uart_port *port)
  */
 static void sci_stop_rx(struct uart_port *port)
 {
-//	asc_out(port, CTL, asc_in(port, CTL)&~ASC_CTL_RXENABLE);
 	syscfg_disable_auto_vcc(port);
 	scg_disable_clock(port);
 	sci_disable_rx_interrupts(port);
@@ -409,8 +407,6 @@ static void sci_configure_field(struct cfg_bits* f )
 {
 	int lsb = ffs(f->mask)-1;
 	int msb = 32-ffs(bitrev32(f->mask));
-///	printk(KERN_DEBUG "wartość: 0x%04x  indeks: %u\n", mask, ffs(mask));
-//	printk(KERN_DEBUG "wartość: 0x%04x  indeks: %u\n", mask, 9-ffs(bitrev8(mask)));
 	f->field = sysconf_claim(f->group,f->reg,lsb,msb,"stsci");
 }
 #endif
@@ -479,7 +475,6 @@ static void sci_set_termios(struct uart_port *port,
 
 	baud = uart_get_baud_rate(port, termios, old, 0,
 				port->uartclk/16);
-        printk(KERN_DEBUG "STSCI set_termios baud: %d\n", baud);
 
 	/* wait for end of current transmission */
 //	while (!sci_tx_empty(port)){};
@@ -504,8 +499,6 @@ static void sci_set_termios(struct uart_port *port,
         asc_out (port, GUARDTIME, 2); //sci
         asc_out (port, TIMEOUT, 254);  //sci
         asc_out (port, RETRIES, 3);   //sci
-
-	printk(KERN_DEBUG "CTL_UPD:   0x%08x \n", ctrl_val);
 
         /* write final value and enable port */
         asc_out (port, CTL, ctrl_val);
@@ -658,8 +651,7 @@ static void do_atr(void *private)
 	tty_prepare_flip_string_flags(port->info->tty, &rb, (char **)&fb, l);
 	kfifo_get(sciport->receq, rb, l);
 	kfifo_get(sciport->flagq, fb, l);
-//	tty_insert_flip_string_flags(port->info->tty, rb, fb, l);
-	printk(KERN_DEBUG "ATR: %s (%d)\n", sci_hexdump(1,rb,l), l );
+	printk(KERN_NOTICE "ATR: %s (%d)\n", sci_hexdump(1,rb,l), l );
 	sciport->isatr = 1;
 	sci_flush_tty(port);
 }
@@ -670,7 +662,6 @@ static inline void sci_disable(struct uart_port *port)
 //	struct sci_pio *pio = &(sciport->pios[SC_COND_VCC]);
 //	stpio_set_pin(pio->pio, 0);	//FIXME
 	scg_disable_clock(port);
-//	sci_flush_tty(port);
 	cancel_delayed_work(&sciport->work);
 }
 #ifdef STM22
@@ -694,9 +685,7 @@ static inline void sci_enable(struct work_struct *work)
 //		(sciport->configured), msecs_to_jiffies(CONFIG_TIMEOUT));
 	printk(KERN_DEBUG "enable: configured: %d\n",sciport->configured);
 	scg_enable_clock(port);
-	
-//	msleep(5);
-//	asc_out(port, CTL, asc_in(port, CTL)|ASC_CTL_RXENABLE);
+
 }
 
 static void sci_socket_interrupt(struct stpio_pin *pin, void *dev)
@@ -791,7 +780,7 @@ static void sci_transmit_chars(struct uart_port *port)
 		unsigned char sb[l];
 		kfifo_get(sciport->sendq, sb, l); //fill sb buffer
 		kfifo_put(sciport->sendq, sb, l); //put back sb buffer to fifo
-		printk(KERN_DEBUG "APDU: %s (%d)\n",sci_hexdump(1,sb,l),l);
+		printk(KERN_INFO "APDU: %s (%d)\n",sci_hexdump(1,sb,l),l);
 		sci_disable_tx_interrupts(port);
 	}
 }
@@ -844,9 +833,9 @@ static inline void sci_receive_chars(struct uart_port *port)
 					asc_out(port, CTL, ctl ^ ASC_CTL_PARITYODD);
 					break;
 				}
-				printk(KERN_DEBUG "Parity %s\n", ctl & ASC_CTL_PARITYODD?"ODD":"EVEN");
+				printk(KERN_NOTICE "Parity %s\n", ctl & ASC_CTL_PARITYODD?"ODD":"EVEN");
 				sciport->ts = (c & 0xff)==TS_DIRECT?(c & 0xff):bitrev8(c)^0xff;
-				printk(KERN_DEBUG "Convention TS 0x%02x\n", sciport->ts);
+				printk(KERN_NOTICE "Convention TS 0x%02x\n", sciport->ts);
 			}
 			sciport->atr_timeout_cnt = unlikely(!sciport->isatr)?15:2;
 			if ( ~(asc_in(port,INTEN) & ASC_INTEN_TOI) )
@@ -913,15 +902,14 @@ static inline void sci_timeout(struct uart_port *port)
 			int l = kfifo_len(sciport->sendq);
 			unsigned char  db[l]; //drop buffer
 			kfifo_get(sciport->sendq, db, l); //drop send fifo
-//			printk(KERN_DEBUG "DB:   %s (%d)\n", sci_hexdump(1,db,l), l );
 			kfifo_get(sciport->receq, db, l); //drop echoed part of receive fifo
 			kfifo_get(sciport->flagq, db, l); //drop echoed part of receive fifo
 			l = kfifo_len(sciport->receq);
 			tty_prepare_flip_string_flags(port->info->tty, &rb, (char **)&fb, l);
 			kfifo_get(sciport->receq, rb, l);
 			kfifo_get(sciport->flagq, fb, l);
-			printk(KERN_DEBUG "SW:   %s (%d)\n", sci_hexdump(1,rb,l), l );
-//			printk(KERN_DEBUG "SW:   %s (%d)\n", sci_hexdump(1,fb,l), l );
+			printk(KERN_INFO "SW:   %s (%d)\n", sci_hexdump(1,rb,l), l );
+//			printk(KERN_INFO "SW:   %s (%d)\n", sci_hexdump(1,fb,l), l );
 			sci_flush_tty(port);
 		}
 //		wake_up_interruptible(&sciport->initwq);
@@ -944,7 +932,6 @@ static irqreturn_t sci_interrupt(int irq, void *ptr)
 	
 	status = asc_in (port, STA);
 	inten = asc_in(port, INTEN);
-//	printk(KERN_DEBUG "%s(): STA: 0x%08x\n",__FUNCTION__, (unsigned int)status);
 	
 //	if ((status & ASC_STA_TNE) && (inten & ASC_INTEN_TNE) ||
 //	    (status & ASC_STA_TOI) && (inten & ASC_INTEN_TOI) ){
@@ -988,14 +975,10 @@ static int sci_set_baud (struct uart_port *port, int baud)
 
         if (baud < 19200) {
                 t = BAUDRATE_VAL_M0(baud, rate);
-		printk(KERN_DEBUG "BAUDRATE_MODE:0x%08x \n", 0);
-		printk(KERN_DEBUG "BAUDRATE_U:0x%08x \n", t);
                 asc_out (port, BAUDRATE, t);
                 return 0;
         } else {
                 t = BAUDRATE_VAL_M1(baud, rate);
-		printk(KERN_DEBUG "BAUDRATE_MODE:0x%08x \n", ASC_CTL_BAUDMODE);
-		printk(KERN_DEBUG "BAUDRATE_U:0x%08x \n", t);
                 asc_out (port, BAUDRATE, t);
                 return ASC_CTL_BAUDMODE;
         }
@@ -1141,9 +1124,6 @@ static int sci_ioctl(struct uart_port *port, unsigned int cmd, unsigned long arg
 
 	default: {
 		ret = -ENOIOCTLCMD;
-//		struct uart_port *port = state->port;
-//		if (port->ops->ioctl)
-//			ret = port->ops->ioctl(port, cmd, arg);
 		break;
 	}
 	}
@@ -1235,18 +1215,14 @@ static void syscfg_enable_auto_vcc(struct uart_port *port)
 
 static int sci_request_irq(struct uart_port *port)
 {
-	struct platform_device *pdev = to_platform_device(port->dev);
-
 #ifdef STM22
         if (request_irq(port->irq, sci_interrupt, SA_INTERRUPT,
-//                        pdev->name, port)) {
                         "stsci", port)) {
 #else
         if (request_irq(port->irq, sci_interrupt, IRQF_DISABLED,
-//                        pdev->name, port)) {
                         "stsci", port)) {
 #endif
-                printk(KERN_ERR "sci: cannot allocate irq.\n");
+                printk(KERN_ERR "STSCI: cannot allocate irq (%d).\n",port->irq);
                 return -ENODEV;
         }
         return 0;
@@ -1265,13 +1241,13 @@ static int sci_pios_init(struct uart_port *port){
 
 	for( i=0;i<sciport->pios_nr; i++){
 		struct sci_pio *pio = &(sciport->pios[i]);
-		if (!pio->name)  //FIXME possible garbage
+		if (!pio->name)
 			continue;
 		pio->pio = stpio_request_pin(pio->port, pio->pin, pio->name, pio->dir);
 		if (pio->pio){
-			printk(KERN_DEBUG "Pio[%d,%d] \"%s\" allocated\n", pio->port,pio->pin,pio->name);
+			printk(KERN_DEBUG "STSCI pio[%d,%d] \"%s\" allocated\n", pio->port,pio->pin,pio->name);
 		} else {
-			printk(KERN_ERR "Pio %s allocation failed\n", pio->name);
+			printk(KERN_ERR "STSCI pio %s allocation failed\n", pio->name);
 			return -EBUSY;
 		}
 		if (pio->handler != 0)
@@ -1290,10 +1266,10 @@ static int sci_pios_free(struct uart_port *port){
 	struct sci_port *sciport = to_sci_port(port);
 	int i;
 
-	printk(KERN_DEBUG "Pios free\n");
+	printk(KERN_DEBUG "STSCI pins released\n");
 	for( i=0;i<sciport->pios_nr; i++){
 		struct sci_pio *pio = &(sciport->pios[i]);
-		if (!pio->name)  //FIXME possible garbage
+		if (!pio->name)
 			continue;
 		if (pio->handler != NULL)
 			stpio_free_irq(pio->pio);
