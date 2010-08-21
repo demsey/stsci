@@ -30,11 +30,13 @@ else
 export CROSS_COMPILE=~/devel/openE2/cuberevo-mini2/build/tmp/cross/sh4/bin/sh4-linux-
 endif # STM22
 endif # CROSS_COMPILE
+STRIP=$(CROSS_COMPILE)strip
 
 all:
 #	$(MAKE) -C $(KDIR) M=`pwd` $@
 #	$(MAKE) -C $(KDIR) M=`pwd` modules
 	$(MAKE) -C $(KDIR) M=`pwd`
+	${STRIP} --strip-unneeded $(NAME).ko
 
 # Module specific targets
 #genbin:
