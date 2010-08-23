@@ -1158,7 +1158,7 @@ static inline void bits_clear(struct cfg_bits *b)
 
 static inline void bits_set_val(struct cfg_bits *b, unsigned long val)
 {
-	writel(readl(b->addr) | (val & b->mask), b->addr);
+	writel((readl(b->addr) & ~b->mask) | (val & b->mask), b->addr);
 }
 
 static void syscfg_enable_scg_clock(struct uart_port *port)
