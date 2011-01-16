@@ -55,6 +55,7 @@ static int sci_pios_init(struct uart_port *port);
 static int sci_pios_free(struct uart_port *port);
 static void sci_transmit_chars(struct uart_port *port);
 static int sci_ioctl(struct uart_port *port, unsigned int cmd, unsigned long arg );
+static int sci_ioctl_reset(struct uart_port *port);
 #ifdef STM22
 static inline void sci_enable(struct uart_port *);
 #else
@@ -157,7 +158,7 @@ static struct sci_pio sci_pios0[] = {
 		.name  	= "UART0_CTS",
 		.port	= 0,
 		.pin	= 4,
-		.dir 	= STPIO_IN,
+		.dir 	= STPIO_OUT,
 	},
 	[5] = {
 		.name  	= "SC_COND_VCC",
@@ -315,8 +316,8 @@ static void sci_reset(struct work_struct *work)
 	struct uart_port *port = &sciport->port;
 #endif
 
-	sci_pios_free(port);
-	sci_pios_init(port);
+	printk(KERN_DEBUG "STSCI[%d] reset\n", port->line);
+	sci_ioctl_reset(port);
 	scg_enable_clock(port);
 }
 
@@ -1050,10 +1051,11 @@ static int sci_get_parameters(struct uart_port *port, struct sci_parameters __us
 
 static int sci_ioctl_reset(struct uart_port *port)
 {
-	sci_disable(port);
-	sci_shutdown(port);
-	msleep(10);
-	sci_startup(port);
+	struct sci_port *sciport = to_sci_port(port);
+	struct sci_pio *pio = &(sciport->pios[UART_CTS]);
+	stpio_set_pin(pio->pio, 0);
+	udelay(51);
+	stpio_set_pin(pio->pio, 1);
 	return 0;
 }
 
@@ -1068,7 +1070,7 @@ static int sci_ioctl(struct uart_port *port, unsigned int cmd, unsigned long arg
 	switch (cmd) {
 	case IOCTL_SET_RESET: /* Set reset */
 		printk(KERN_DEBUG "received IOCTL_SET_RESET\n");
-//		ret = sci_ioctl_reset(port);
+		ret = sci_ioctl_reset(port);
 		break;
 
 	case IOCTL_SET_CLOCK_START: /* Start clock */
@@ -1098,7 +1100,7 @@ static int sci_ioctl(struct uart_port *port, unsigned int cmd, unsigned long arg
 	case IOCTL_SET_ATR_READY: /* Set ATR ready status */
 		{
 			unsigned long ready = sciport->isatr;
-			printk(KERN_DEBUG "received IOCTL_SET_ATR_READY\n");
+			printk(KERN_DEBUG "received IOCTL_SET_ATR_READY %d\n", ready);
 			copy_to_user(arg,&ready,sizeof(arg));
 		}
 		break;
