@@ -1143,7 +1143,7 @@ static int sci_ioctl(struct uart_port *port, unsigned int cmd, unsigned long arg
 
 	case IOCTL_SET_ATR_READY: /* Set ATR ready status */
 		{
-			unsigned long ready = sciport->isatr;
+			int ready = (int)sciport->isatr;
 			printk(KERN_DEBUG "received IOCTL_SET_ATR_READY %d\n", ready);
 			copy_to_user(arg,&ready,sizeof(arg));
 		}
