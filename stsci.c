@@ -47,8 +47,6 @@ static void scg_enable_clock( struct uart_port *port );
 static void scg_disable_clock( struct uart_port *port );
 static void syscfg_enable_scg_clock(struct uart_port *port);
 static int sci_set_baud (struct uart_port *port, int baud);
-static void syscfg_enable_auto_vcc(struct uart_port *port);
-static void syscfg_disable_auto_vcc(struct uart_port *port);
 static int sci_request_irq(struct uart_port *port);
 static void sci_free_irq(struct uart_port *port);
 static int sci_pios_init(struct uart_port *port);
@@ -102,6 +100,31 @@ struct cfg_bits
 
 };
 
+#ifdef STM22
+#else
+struct sci_syscfg
+{
+	struct cfg_bits autovcc;
+	struct cfg_bits scdetpol;
+};
+#endif
+
+static struct sci_syscfg sci_syscfgs = {
+
+	.autovcc = {
+		.addr	= SYS_CFG7,
+		.mask	= SC_COND_VCC_EN,
+		.group	= SYS_CFG,
+		.reg	= 7,
+	},
+	.scdetpol = {
+		.addr	= SYS_CFG7,
+		.mask	= SC_DETECT_POL,
+		.group	= SYS_CFG,
+		.reg	= 7,
+	},
+};
+
 struct sci_port
 {
 	struct uart_port port;
@@ -114,8 +137,6 @@ struct sci_port
 	struct cfg_bits	scgclkval;
 	struct cfg_bits	scgclken;
 	struct cfg_bits	clksrc;
-	struct cfg_bits	autovcc;
-	struct cfg_bits	scdetpol;
 #ifdef STM22
 	struct work_struct	work;
 #else
@@ -152,7 +173,7 @@ static struct sci_pio sci_pios0[] = {
 		.name   = "SC_CLK_OUT",
 		.port	= 0,
 		.pin	= 3,
-		.dir 	= STPIO_ALT_BIDIR,
+		.dir 	= STPIO_ALT_OUT,
 	},
 	[4] = {
 		.name  	= "UART0_CTS",
@@ -164,11 +185,51 @@ static struct sci_pio sci_pios0[] = {
 		.name  	= "SC_COND_VCC",
 		.port	= 0,
 		.pin	= 5,
-		.dir 	= STPIO_ALT_OUT,
+		.dir 	= STPIO_OUT,
 	},
 	[7] = {
 		.name  	= "SC_DETECT",
 		.port	= 0,
+		.pin	= 7,
+		.dir 	= STPIO_IN,
+		.handler= sci_socket_interrupt,
+	},
+};
+
+static struct sci_pio sci_pios1[] = {
+	[0] = {
+		.name	= "UART0_TxD",
+		.port	= 1,
+		.pin	= 0,
+		.dir 	= STPIO_ALT_BIDIR,
+	},
+	[1] = {
+		.name  	= "UART0_RxD",
+		.port	= 1,
+		.pin	= 1,
+		.dir 	= STPIO_IN,
+	},
+	[3] = {
+		.name   = "SC_CLK_OUT",
+		.port	= 1,
+		.pin	= 3,
+		.dir 	= STPIO_ALT_OUT,
+	},
+	[4] = {
+		.name  	= "UART0_CTS",
+		.port	= 1,
+		.pin	= 4,
+		.dir 	= STPIO_OUT,
+	},
+	[5] = {
+		.name  	= "SC_COND_VCC",
+		.port	= 1,
+		.pin	= 5,
+		.dir 	= STPIO_OUT,
+	},
+	[7] = {
+		.name  	= "SC_DETECT",
+		.port	= 1,
 		.pin	= 7,
 		.dir 	= STPIO_IN,
 		.handler= sci_socket_interrupt,
@@ -283,7 +344,6 @@ static void sci_stop_tx(struct uart_port *port)
  */
 static void sci_stop_rx(struct uart_port *port)
 {
-	syscfg_disable_auto_vcc(port);
 	scg_disable_clock(port);
 	sci_disable_rx_interrupts(port);
         printk(KERN_INFO "STSCI stop_rx.\n");
@@ -351,7 +411,6 @@ static int sci_startup(struct uart_port *port)
 
 	syscfg_enable_scg_clock(port);
 
-	syscfg_enable_auto_vcc(port);
 	cancel_delayed_work(&sciport->work);
 
 #ifdef STM22
@@ -386,7 +445,6 @@ static void sci_shutdown(struct uart_port *port)
 }
 static void sci_release_port(struct uart_port *port)
 {
-	/* Nothing here yet .. */
 	struct sci_port *sciport = to_sci_port(port);
 
 	release_mem_region(port->mapbase, 0x100+1);
@@ -395,10 +453,6 @@ static void sci_release_port(struct uart_port *port)
 #else
 	if (sciport->clksrc.field)
 		sysconf_release(sciport->clksrc.field);
-	if (sciport->autovcc.field)
-		sysconf_release(sciport->autovcc.field);
-	if (sciport->scdetpol.field)
-		sysconf_release(sciport->scdetpol.field);
 #endif
 }
 
@@ -414,7 +468,6 @@ static void sci_configure_field(struct cfg_bits* f )
 
 static int sci_request_port(struct uart_port *port)
 {
-	/* Nothing here yet .. */
 	struct sci_port *sciport = to_sci_port(port);
 
 	if (!request_mem_region(port->mapbase, 0x100+1, "stsci"))
@@ -423,8 +476,6 @@ static int sci_request_port(struct uart_port *port)
 #ifdef STM22
 #else
 	sci_configure_field(&sciport->clksrc);
-	sci_configure_field(&sciport->autovcc);
-	sci_configure_field(&sciport->scdetpol);
 #endif
 	return 0;
 }
@@ -444,7 +495,6 @@ static void sci_config_port(struct uart_port *port, int flags)
 
 	sciport->configured = 0;
 
-//	syscfg_enable_auto_vcc(port);
 	syscfg_enable_scg_clock(port);
 
 	init_waitqueue_head(&sciport->initwq);
@@ -579,18 +629,6 @@ struct sci_port sci_ports[SCI_NPORTS] = {
 			.group	= SYS_CFG,
 			.reg	= 7,
 		},
-		.autovcc = {
-			.addr	= SYS_CFG7,
-			.mask	= SC_COND_VCC_EN,
-			.group	= SYS_CFG,
-			.reg	= 7,
-		},
-		.scdetpol = {
-			.addr	= SYS_CFG7,
-			.mask	= SC_DETECT_POL,
-			.group	= SYS_CFG,
-			.reg	= 7,
-		},
 	},
 	/* UART1 */
 	{
@@ -603,11 +641,12 @@ struct sci_port sci_ports[SCI_NPORTS] = {
 			.fifosize	= FIFO_SIZE,
 			.line		= 1,
 		},
-//		.pio_port	= 1,
-//		.pio_pin	= {0, 1, 4, 5},
+		.pios		= sci_pios1,
+		.pios_nr	= ARRAY_SIZE(sci_pios1),
 		.baud		= 9600,
 		.ctrl		= (ASC_CTL_MODE_8BIT_PAR |
 				ASC_CTL_STOP_1_HALFBIT |
+				ASC_CTL_PARITYODD |
 				ASC_CTL_SCENABLE |
 				ASC_CTL_RXENABLE |
 				ASC_CTL_FIFOENABLE |
@@ -623,6 +662,8 @@ struct sci_port sci_ports[SCI_NPORTS] = {
 		.clksrc = {
 			.addr	= SYS_CFG7,		/* COMMs configuration register */
 			.mask	= PIO1_SCCLK_NOT_CLK_DSS,
+			.group	= SYS_CFG,
+			.reg	= 7,
 		},
 	},
 };
@@ -700,10 +741,13 @@ static void sci_socket_interrupt(struct stpio_pin *pin, void *dev)
 	sciport->ts	= 0;
 	stpio_disable_irq(pin);
 	stpio_enable_irq(pin, sciport->iscard);
-	if ( sciport->iscard == IRQ_TEST_LEVEL )
+	if ( sciport->iscard == IRQ_TEST_LEVEL ){
+		printk(KERN_DEBUG "Card[%d] removed\n", port->line);
 		sci_disable(port);
-	else {
 	  	stpio_set_pin(pio->pio, 1);
+	} else {
+		printk(KERN_DEBUG "Card[%d] inserted\n", port->line);
+	  	stpio_set_pin(pio->pio, 0);
 #ifdef STM22
 		INIT_WORK(&sciport->work, (void (*)(void *))sci_enable, port);
 #else
@@ -1188,27 +1232,25 @@ static void scg_disable_clock( struct uart_port *port )
 	printk(KERN_DEBUG "SCG%d clock disabled\n", port->line);
 }
 
-static void syscfg_disable_auto_vcc(struct uart_port *port)
+static void syscfg_disable_auto_vcc(void)
 {
-	struct sci_port *sciport = to_sci_port(port);
 #ifdef STM22
-	bits_clear(&sciport->autovcc);
-	bits_clear(&sciport->scdetpol);
+	bits_clear(&sci_syscfgs->autovcc);
+	bits_clear(&sci_syscfgs->scdetpol);
 #else
-	sysconf_write(sciport->autovcc.field, 0);
-	sysconf_write(sciport->scdetpol.field, 0);
+	sysconf_write(sci_syscfgs.autovcc.field, 0);
+	sysconf_write(sci_syscfgs.scdetpol.field, 0);
 #endif
 }
 
-static void syscfg_enable_auto_vcc(struct uart_port *port)
+static void syscfg_enable_auto_vcc(void)
 {
-	struct sci_port *sciport = to_sci_port(port);
 #ifdef STM22
-	bits_set(&sciport->autovcc);
-	bits_set(&sciport->scdetpol);
+	bits_clear(&sci_syscfgs->autovcc);
+	bits_set(&sci_syscfgs->scdetpol);
 #else
-	sysconf_write(sciport->autovcc.field, 1);
-	sysconf_write(sciport->scdetpol.field, 1);
+	sysconf_write(sci_syscfgs.autovcc.field, 1);
+	sysconf_write(sci_syscfgs.scdetpol.field, 1);
 #endif
 }
 
@@ -1293,6 +1335,30 @@ static void sci_tty_config(struct tty_driver *tty_driver)
 	ios->c_oflag &= ~OPOST;
 }
 
+static void sci_release_syscfg(void)
+{
+	syscfg_disable_auto_vcc();
+#ifdef STM22
+#else
+	if (sci_syscfgs.autovcc.field)
+		sysconf_release(sci_syscfgs.autovcc.field);
+	if (sci_syscfgs.scdetpol.field)
+		sysconf_release(sci_syscfgs.scdetpol.field);
+#endif
+}
+
+static int sci_request_syscfg(void)
+{
+#ifdef STM22
+#else
+	struct sci_syscfg *s = &sci_syscfgs;
+	sci_configure_field(&s->autovcc);
+	sci_configure_field(&s->scdetpol);
+#endif
+	syscfg_enable_auto_vcc();
+	return 0;
+}
+
 static int __init sci_init(void)
 {
 	int line, ret;
@@ -1310,13 +1376,14 @@ static int __init sci_init(void)
 	printk(KERN_DEBUG "Rate: %d\n", (int)rate);
 
 	ret = uart_register_driver(&sci_uart_driver);
+	ret = sci_request_syscfg();
 	sci_tty_config(sci_uart_driver.tty_driver);
 	if (ret == 0) {
-//		for (line=0; line<SCI_NPORTS; line++) {
-		for (line=0; line<1; line++) {
+		for (line=0; line<SCI_NPORTS; line++) {
 			struct sci_port *sciport = &sci_ports[line];
 			sciport->port.uartclk = rate;
-			uart_add_one_port(&sci_uart_driver, &sciport->port);
+			if (&sciport->port)
+				uart_add_one_port(&sci_uart_driver, &sciport->port);
 		}
 	}
 
@@ -1330,13 +1397,13 @@ static void __exit sci_exit(void)
 {
 	int line;
 
-//	for (line = 0; line < SCI_NPORTS; line++)
-	for (line = 0; line < 1; line++){
+	for (line = 0; line < SCI_NPORTS; line++){
 		struct uart_port *port = &(sci_ports[line]).port;
 		uart_remove_one_port(&sci_uart_driver, port);
 		sci_pios_free(port);
 		sci_free_irq(port);
 	}
+	sci_release_syscfg();
 	uart_unregister_driver(&sci_uart_driver);
 
  	printk(KERN_INFO "STSCI unregistered.\n");
